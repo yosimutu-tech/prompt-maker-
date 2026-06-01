@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PromptForge｜プロンプト作成ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e14;
+    --surface: #16161f;
+    --card: #1e1e2a;
+    --accent: #7c5cfc;
+    --accent2: #fc5c7d;
+    --text: #e8e8f0;
+    --muted: #7a7a9a;
+    --border: #2a2a3a;
+    --success: #4cde9a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND MESH ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(124,92,252,.18) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 80% 80%, rgba(252,92,125,.12) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  #app { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  /* ── HEADER ── */
+  header { text-align: center; padding: 40px 0 32px; }
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    background: linear-gradient(135deg, #7c5cfc, #fc5c7d);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: -1px;
+  }
+  header p { color: var(--muted); margin-top: 8px; font-size: .9rem; }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .tab-btn {
+    flex: 1; padding: 12px; border-radius: 10px; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--muted); cursor: pointer;
+    font-family: 'Zen Kaku Gothic New', sans-serif; font-size: .9rem; font-weight: 700;
+    transition: all .2s;
+  }
+  .tab-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(124,92,252,.1); }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card); border: 1.5px solid var(--border);
+    border-radius: 16px; padding: 24px; margin-bottom: 16px;
+  }
+  .card-label {
+    font-size: .75rem; font-family: 'Space Mono', monospace;
+    color: var(--accent); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  /* ── FORM ── */
+  label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 6px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input, select, textarea {
+    width: 100%; background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 10px; color: var(--text); font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: .9rem; padding: 10px 14px; outline: none; transition: border-color .2s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--card); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* ── API KEY ── */
+  .apikey-row { display: flex; gap: 8px; align-items: center; }
+  .apikey-row input { flex: 1; }
+  .apikey-toggle {
+    background: none; border: 1.5px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 10px 12px; cursor: pointer; font-size: .8rem; white-space: nowrap;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 12px 22px; border-radius: 10px; border: none; cursor: pointer;
+    font-family: 'Zen Kaku Gothic New', sans-serif; font-size: .9rem; font-weight: 700;
+    transition: all .2s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #7c5cfc, #9b7cfd);
+    color: #fff; width: 100%; justify-content: center; margin-top: 16px;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,92,252,.4); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .btn-sm {
+    padding: 6px 12px; font-size: .8rem; border-radius: 7px; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--muted); cursor: pointer;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { border-color: var(--accent2); color: var(--accent2); }
+  .btn-danger:hover { background: rgba(252,92,125,.1); }
+
+  /* ── OUTPUT ── */
+  .output-box {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 16px; white-space: pre-wrap;
+    font-size: .9rem; line-height: 1.7; color: var(--text); min-height: 60px;
+    position: relative;
+  }
+  .output-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+  /* ── SAVED LIST ── */
+  .saved-item {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 12px;
+    transition: border-color .2s;
+  }
+  .saved-item:hover { border-color: var(--accent); }
+  .saved-item-title { font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .saved-item-body { font-size: .85rem; color: var(--muted); line-height: 1.6; white-space: pre-wrap; }
+  .saved-item-meta { font-size: .75rem; color: var(--muted); margin-top: 8px; font-family: 'Space Mono', monospace; }
+  .saved-item-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .empty-state { text-align: center; color: var(--muted); padding: 40px 0; font-size: .9rem; }
+
+  /* ── SPINNER ── */
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--success); color: #0e0e14; padding: 10px 20px;
+    border-radius: 999px; font-size: .85rem; font-weight: 700;
+    opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999;
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── IMPROVE TAG ── */
+  .tag-improve {
+    display: inline-block; font-size: .72rem; font-family: 'Space Mono', monospace;
+    background: rgba(252,92,125,.15); color: var(--accent2);
+    border-radius: 4px; padding: 2px 7px; margin-left: 8px; vertical-align: middle;
+  }
+
+  .section-hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>⚡ PromptForge</h1>
+    <p>AIプロンプトを作成・改善・管理するツール</p>
+  </header>
+
+  <!-- API KEY -->
+  <div class="card">
+    <div class="card-label">🔑 API設定</div>
+    <div class="apikey-row">
+      <input type="password" id="apiKey" placeholder="Anthropic APIキーを入力 (sk-ant-...)" autocomplete="off">
+      <button class="apikey-toggle" onclick="toggleKey()">表示</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('create')">✏️ 作成</button>
+    <button class="tab-btn" onclick="switchTab('saved')">📂 保存済み</button>
+  </div>
+
+  <!-- CREATE TAB -->
+  <div id="tab-create">
+    <div class="card">
+      <div class="card-label">📋 プロンプト条件入力</div>
+
+      <label>目的・用途</label>
+      <select id="purpose">
+        <option value="">選んでください</option>
+        <option value="ブログ記事の執筆">ブログ記事の執筆</option>
+        <option value="メール・ビジネス文書作成">メール・ビジネス文書作成</option>
+        <option value="SNS投稿文作成">SNS投稿文作成</option>
+        <option value="アイデア出し・ブレスト">アイデア出し・ブレスト</option>
+        <option value="要約・まとめ">要約・まとめ</option>
+        <option value="翻訳">翻訳</option>
+        <option value="コード生成・説明">コード生成・説明</option>
+        <option value="カスタム（下記に入力）">カスタム（下記に入力）</option>
+      </select>
+
+      <label>具体的な内容・テーマ</label>
+      <textarea id="topic" placeholder="例：新商品のランチングに向けたInstagram投稿を5つ作りたい"></textarea>
+
+      <label>対象読者・ターゲット</label>
+      <input type="text" id="audience" placeholder="例：30代女性、初心者エンジニア、経営者">
+
+      <label>口調・スタイル</label>
+      <select id="tone">
+        <option value="プロフェッショナル">プロフェッショナル</option>
+        <option value="カジュアル・親しみやすい">カジュアル・親しみやすい</option>
+        <option value="丁寧・フォーマル">丁寧・フォーマル</option>
+        <option value="熱量高め・エネルギッシュ">熱量高め・エネルギッシュ</option>
+        <option value="やさしく分かりやすい">やさしく分かりやすい</option>
+      </select>
+
+      <label>出力形式</label>
+      <select id="format">
+        <option value="自由形式">自由形式</option>
+        <option value="箇条書き・リスト">箇条書き・リスト</option>
+        <option value="番号付きステップ">番号付きステップ</option>
+        <option value="表・比較">表・比較</option>
+        <option value="見出し付き長文">見出し付き長文</option>
+      </select>
+
+      <label>その他の条件・補足</label>
+      <textarea id="extra" placeholder="文字数制限、禁止ワード、参考情報など（任意）"></textarea>
+
+      <button class="btn btn-primary" id="genBtn" onclick="generatePrompt()">
+        ✨ プロンプトを生成する
+      </button>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="card" id="outputCard" style="display:none">
+      <div class="card-label">🚀 生成されたプロンプト</div>
+      <div class="output-box" id="outputBox"></div>
+      <div class="output-actions">
+        <button class="btn btn-sm" onclick="copyOutput()">📋 コピー</button>
+        <button class="btn btn-sm" onclick="savePrompt()">💾 保存</button>
+        <button class="btn btn-sm" onclick="improvePrompt()">🔧 AIに改善してもらう</button>
+      </div>
+
+      <!-- IMPROVED -->
+      <div id="improveSection" class="section-hidden" style="margin-top:16px">
+        <div class="card-label">💡 改善案 <span class="tag-improve">AI提案</span></div>
+        <div class="output-box" id="improveBox"></div>
+        <div class="output-actions">
+          <button class="btn btn-sm" onclick="copyImprove()">📋 コピー</button>
+          <button class="btn btn-sm" onclick="saveImprove()">💾 保存（改善版）</button>
+          <button class="btn btn-sm" onclick="useImprove()">⬆️ これをメインにする</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED TAB -->
+  <div id="tab-saved" class="section-hidden">
+    <div id="savedList"></div>
+  </div>
+</div>
+
+<div id="toast">コピーしました！</div>
+
+<script>
+// ── STATE ──
+let savedPrompts = JSON.parse(localStorage.getItem('pf_prompts') || '[]');
+let currentOutput = '';
+let currentImprove = '';
+
+// ── TABS ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', (i===0 && tab==='create') || (i===1 && tab==='saved'));
+  });
+  document.getElementById('tab-create').classList.toggle('section-hidden', tab !== 'create');
+  document.getElementById('tab-saved').classList.toggle('section-hidden', tab !== 'saved');
+  if (tab === 'saved') renderSaved();
+}
+
+// ── API KEY ──
+function toggleKey() {
+  const inp = document.getElementById('apiKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+function getKey() { return document.getElementById('apiKey').value.trim(); }
+
+// ── GENERATE ──
+async function generatePrompt() {
+  if (!getKey()) { alert('APIキーを入力してください'); return; }
+  const purpose = document.getElementById('purpose').value;
+  const topic = document.getElementById('topic').value;
+  const audience = document.getElementById('audience').value;
+  const tone = document.getElementById('tone').value;
+  const format = document.getElementById('format').value;
+  const extra = document.getElementById('extra').value;
+
+  if (!topic) { alert('内容・テーマを入力してください'); return; }
+
+  const userInput = `
+目的: ${purpose || '未指定'}
+内容・テーマ: ${topic}
+対象読者: ${audience || '未指定'}
+口調: ${tone}
+出力形式: ${format}
+補足: ${extra || 'なし'}
+  `.trim();
+
+  const systemPrompt = `あなたはプロのプロンプトエンジニアです。
+ユーザーの条件をもとに、ChatGPTやClaudeで使える高品質な日本語プロンプトを1つ作成してください。
+プロンプトは「あなたは〜」や「以下の条件で〜」で始まる形式にし、具体的で明確に書いてください。
+プロンプト本文だけを出力してください。説明文や前置きは不要です。`;
+
+  setLoading(true);
+  document.getElementById('improveSection').classList.add('section-hidden');
+  document.getElementById('outputCard').style.display = 'block';
+  document.getElementById('outputBox').textContent = '生成中...';
+
+  try {
+    const res = await callAPI(systemPrompt, userInput);
+    currentOutput = res;
+    document.getElementById('outputBox').textContent = res;
+  } catch(e) {
+    document.getElementById('outputBox').textContent = 'エラー: ' + e.message;
+  }
+  setLoading(false);
+}
+
+// ── IMPROVE ──
+async function improvePrompt() {
+  if (!currentOutput) return;
+  if (!getKey()) { alert('APIキーを入力してください'); return; }
+
+  const sys = `あなたはプロのプロンプトエンジニアです。
+以下のプロンプトを分析し、より効果的・明確・具体的になるよう改善してください。
+改善したプロンプト本文だけを出力してください。改善点の説明は不要です。`;
+
+  document.getElementById('improveSection').classList.remove('section-hidden');
+  document.getElementById('improveBox').textContent = '改善中...';
+  setLoading(true);
+
+  try {
+    const res = await callAPI(sys, currentOutput);
+    currentImprove = res;
+    document.getElementById('improveBox').textContent = res;
+  } catch(e) {
+    document.getElementById('improveBox').textContent = 'エラー: ' + e.message;
+  }
+  setLoading(false);
+}
+
+// ── API CALL ──
+async function callAPI(system, userMsg) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': getKey(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+// ── SAVE ──
+function savePrompt(text, label) {
+  const t = text || currentOutput;
+  if (!t) return;
+  const topic = document.getElementById('topic').value || '無題';
+  const entry = {
+    id: Date.now(),
+    title: (label ? '[改善版] ' : '') + topic.slice(0,30),
+    body: t,
+    date: new Date().toLocaleString('ja-JP')
+  };
+  savedPrompts.unshift(entry);
+  localStorage.setItem('pf_prompts', JSON.stringify(savedPrompts));
+  showToast('保存しました！');
+}
+function saveImprove() { savePrompt(currentImprove, true); }
+
+function useImprove() {
+  if (!currentImprove) return;
+  currentOutput = currentImprove;
+  document.getElementById('outputBox').textContent = currentImprove;
+  document.getElementById('improveSection').classList.add('section-hidden');
+  showToast('メインに設定しました！');
+}
+
+// ── COPY ──
+function copyOutput() { copyText(currentOutput); }
+function copyImprove() { copyText(currentImprove); }
+function copyText(t) {
+  if (!t) return;
+  navigator.clipboard.writeText(t).then(() => showToast('コピーしました！'));
+}
+
+// ── SAVED LIST ──
+function renderSaved() {
+  const el = document.getElementById('savedList');
+  if (!savedPrompts.length) {
+    el.innerHTML = '<div class="empty-state">まだ保存されたプロンプトはありません</div>';
+    return;
+  }
+  el.innerHTML = savedPrompts.map(p => `
+    <div class="saved-item">
+      <div class="saved-item-title">
+        <span>${escHtml(p.title)}</span>
+      </div>
+      <div class="saved-item-body">${escHtml(p.body)}</div>
+      <div class="saved-item-meta">${p.date}</div>
+      <div class="saved-item-actions">
+        <button class="btn btn-sm" onclick="copyText(savedPrompts.find(x=>x.id===${p.id}).body)">📋 コピー</button>
+        <button class="btn btn-sm btn-danger" onclick="deletePrompt(${p.id})">🗑️ 削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deletePrompt(id) {
+  if (!confirm('削除しますか？')) return;
+  savedPrompts = savedPrompts.filter(p => p.id !== id);
+  localStorage.setItem('pf_prompts', JSON.stringify(savedPrompts));
+  renderSaved();
+}
+
+// ── UTILS ──
+function setLoading(on) {
+  const btn = document.getElementById('genBtn');
+  btn.disabled = on;
+  btn.innerHTML = on
+    ? '<div class="spinner"></div> 生成中...'
+    : '✨ プロンプトを生成する';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
